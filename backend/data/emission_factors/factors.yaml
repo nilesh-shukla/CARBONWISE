@@ -1,0 +1,79 @@
+# Traceable Emission Factor Registry for CARBONWISE
+# Sourced in Stage A and verified under Stage B.1 provenance audit
+
+factors:
+  - id: electricity_grid_india_cea
+    activity_type: electricity
+    fuel_energy_source: grid_electricity
+    value: 0.716
+    original_unit: tCO2/MWh
+    unit_normalized: kgCO2/kWh
+    activity_unit: kWh
+    multiplier_to_kg_co2_per_kwh: 1.0
+    geography: India
+    reference_year: "FY 2022-23 (Version 20.0, Dec 2024)"
+    source_title: "CO2 Baseline Database for the Indian Power Sector, User Guide Version 20.0, Table S-1, Central Electricity Authority (CEA)"
+    source_url: "https://cea.nic.in/cdm-co2-baseline-database/?lang=en"
+    gases_covered: "CO2"
+    boundary: "indirect_scope_2"
+    derivation: "Directly published in CEA User Guide Version 20.0 Table S-1 as Weighted Average Emission Rate (incl. RES) of 0.716 tCO2/MWh. Normalized 1:1 via 1 tCO2/MWh = (1,000 kg CO2) / (1,000 kWh) = 1.0 kgCO2/kWh at generation busbar."
+    assumptions: "National grid average; includes renewable energy sources; excludes technical transmission and distribution losses; CO2 emissions only."
+    verification_notes: "Independently verified from CEA Baseline Database User Guide Version 20.0 Table S-1."
+    status: verified
+
+  - id: lpg_stationary_ipcc_2006
+    activity_type: cooking_heating
+    fuel_energy_source: lpg
+    value: 2.98463
+    original_unit: kgCO2/TJ
+    unit_normalized: kgCO2/kg
+    activity_unit: kg
+    multiplier_to_kg_co2_per_kg: 1.0
+    geography: global_default
+    reference_year: "2006"
+    source_title: "2006 IPCC Guidelines for National Greenhouse Gas Inventories, Volume 2 (Energy), Chapter 1 Table 1.2 and Chapter 2 Table 2.5"
+    source_url: "https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html"
+    gases_covered: "CO2"
+    boundary: "direct_scope_1"
+    derivation: "Step 1: IPCC 2006 Vol 2 Ch 1 Table 1.2 default Net Calorific Value (NCV) for LPG = 47.3 TJ/Gg = 0.0000473 TJ/kg. Step 2: IPCC 2006 Vol 2 Ch 2 Table 2.5 default residential CO2 emission factor = 63,100 kgCO2/TJ. Step 3: Combined mass factor = 0.0000473 TJ/kg * 63,100 kgCO2/TJ = 2.98463 kgCO2/kg."
+    assumptions: "100% carbon oxidation assumed per IPCC Tier 1 stationary defaults; global default (not India-specific); CO2 emissions only."
+    verification_notes: "Independently verified from 2006 IPCC Guidelines Vol 2 Ch 1 Table 1.2 and Ch 2 Table 2.5."
+    status: verified
+
+  - id: petrol_road_ipcc_2006_volumetric
+    activity_type: transport
+    fuel_energy_source: petrol
+    value: null
+    original_unit: kgCO2/TJ
+    unit_normalized: kgCO2/litre
+    activity_unit: litres
+    multiplier_to_kg_co2_per_litre: null
+    geography: global_default
+    reference_year: "2006"
+    source_title: "2006 IPCC Guidelines for National Greenhouse Gas Inventories, Volume 2 (Energy), Chapter 1 Table 1.2 and Chapter 3 Table 3.2.1"
+    source_url: "https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html"
+    gases_covered: "CO2"
+    boundary: "direct_scope_1"
+    derivation: "NCV (44.3 TJ/Gg) and EF (69,300 kgCO2/TJ) yield 3.0700 kgCO2/kg fuel on a mass basis. Conversion to volumetric factor (kgCO2/litre) requires fuel density (kg/litre), which is omitted from IPCC Vol 2 defaults."
+    assumptions: "Volumetric factor cannot be calculated without an independently verified density value."
+    verification_notes: "Energy/mass parameters verified in IPCC 2006 Vol 2. Volumetric density is not independently verified and is marked unresolved."
+    status: unresolved
+
+  - id: diesel_road_ipcc_2006_volumetric
+    activity_type: transport
+    fuel_energy_source: diesel
+    value: null
+    original_unit: kgCO2/TJ
+    unit_normalized: kgCO2/litre
+    activity_unit: litres
+    multiplier_to_kg_co2_per_litre: null
+    geography: global_default
+    reference_year: "2006"
+    source_title: "2006 IPCC Guidelines for National Greenhouse Gas Inventories, Volume 2 (Energy), Chapter 1 Table 1.2 and Chapter 3 Table 3.2.1"
+    source_url: "https://www.ipcc-nggip.iges.or.jp/public/2006gl/vol2.html"
+    gases_covered: "CO2"
+    boundary: "direct_scope_1"
+    derivation: "NCV (43.0 TJ/Gg) and EF (74,100 kgCO2/TJ) yield 3.1863 kgCO2/kg fuel on a mass basis. Conversion to volumetric factor (kgCO2/litre) requires fuel density (kg/litre), which is omitted from IPCC Vol 2 defaults."
+    assumptions: "Volumetric factor cannot be calculated without an independently verified density value."
+    verification_notes: "Energy/mass parameters verified in IPCC 2006 Vol 2. Volumetric density is not independently verified and is marked unresolved."
+    status: unresolved
