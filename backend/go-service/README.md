@@ -1,5 +1,10 @@
 # CARBONWISE Go API
 
+The supplied Compose file is a local-development stack, not a production deployment.
+Production requires an HTTPS ingress to Go, private FastAPI and PostgreSQL networking,
+externally managed secrets, and database backups/recovery. Those infrastructure controls
+are not implemented by this repository.
+
 This service provides authenticated accounts and calculation history. It delegates every
 emissions calculation to the existing FastAPI endpoint at `POST /api/v1/calculate`; FastAPI
 remains the calculation source of truth. The Go API does not protect direct access to FastAPI,
@@ -7,11 +12,13 @@ so deploy FastAPI on a private network or restrict its ingress at the network/pr
 
 ## Requirements and local start
 
-Use Go 1.24 or newer and Docker Compose. Start PostgreSQL from this directory:
+Use Go 1.24 or newer and Docker Compose. The recommended local path is the
+containerized stack from this directory:
 
 ```powershell
-docker compose up -d postgres
-Copy-Item .env.example .env
+docker compose config --quiet
+docker compose up --build -d
+docker compose ps
 ```
 
 Set `JWT_SECRET` in the current shell to a private random value of at least 32 characters.
@@ -25,7 +32,7 @@ $env:FASTAPI_URL = "http://127.0.0.1:8000"
 go run ./cmd/api
 ```
 
-Start FastAPI separately from `backend/`:
+For manual, non-containerized development, start FastAPI separately from `backend/`:
 
 ```powershell
 uvicorn app.main:app --host 127.0.0.1 --port 8000
@@ -34,6 +41,21 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 At startup the Go service pings PostgreSQL and applies ordered SQL files in
 `internal/store/migrations/` transactionally. `GET /health` is a liveness check and
 `GET /readyz` checks the database. Do not expose port 5433 outside a development machine.
+
+Compose uses `postgres:5432` and `http://fastapi:8000` for internal service URLs and publishes
+development-only host ports 5433, 8000, and 8080 on loopback. PostgreSQL and FastAPI healthchecks
+must pass before Compose starts Go. The Go container applies the embedded migrations at startup.
+Check the stack with:
+
+```powershell
+docker compose ps
+Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8080/health
+Invoke-RestMethod http://127.0.0.1:8080/readyz
+```
+
+Stop normally with `docker compose down`; this preserves the named PostgreSQL volume. Use
+`docker compose down -v` only for intentional deletion of all local development data.
 
 ## Configuration
 
@@ -52,6 +74,12 @@ At startup the Go service pings PostgreSQL and applies ordered SQL files in
 | `COOKIE_SAME_SITE` | No | `lax`; `none` requires secure cookies |
 | `ALLOWED_ORIGINS` | Production | Comma-separated exact browser origins; refresh/logout validate Origin |
 | `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS` | No | `20`, `5` |
+
+Compose supplies `DATABASE_URL` and `FASTAPI_URL` using internal service names. If a database
+password contains URL-reserved characters, provide a complete URL through the Compose
+`DATABASE_URL` override instead of relying on the interpolated default. Compose's default
+PostgreSQL password and JWT secret are for local development only; override them before
+sharing the stack or deploying it.
 
 In production, terminate TLS at a trusted reverse proxy, set `COOKIE_SECURE=true`, configure
 exact `ALLOWED_ORIGINS`, and use a private database and FastAPI network. The in-memory login
@@ -98,6 +126,22 @@ calculation if FastAPI returns an error, times out, or responds with an invalid 
 
 ## Verification
 
+### Containerized smoke test
+
+With the stack running, inspect health and recent logs:
+
+```powershell
+docker compose ps
+docker compose logs --tail 100 postgres fastapi go-api
+Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8080/health
+Invoke-RestMethod http://127.0.0.1:8080/readyz
+```
+
+The Go `/readyz` endpoint verifies PostgreSQL. Compose startup ordering separately verifies
+FastAPI's `/health`; it does not make FastAPI public in a production deployment, where it should
+remain on a private network.
+
 Run Go unit and HTTP tests with `go test ./...`. Run PostgreSQL repository/migration tests
 against a dedicated, disposable PostgreSQL database (the test applies migrations and creates
 and removes uniquely named rows):
@@ -116,3 +160,14 @@ users (and dependent rows). The integration tests are skipped when
 `CARBONWISE_TEST_DATABASE_URL` is unset. For a full local E2E run, point `DATABASE_URL` at
 that same disposable test database while starting Go, and start FastAPI separately as shown
 above. Do not point test variables at production or private survey databases.
+
+Troubleshooting:
+
+- If Go exits with a database or JWT configuration error, inspect `docker compose config` and
+  verify local `.env` or shell overrides.
+- If Go reports `database unavailable`, inspect `docker compose logs postgres`; do not delete the
+  volume as a first response.
+- If calculations return `502 CALCULATOR_UNAVAILABLE`, inspect `docker compose logs fastapi go-api`
+  and verify the FastAPI health endpoint.
+- Use a separate test database for disposable integration tests; do not reset the normal
+  `carbonwise-postgres` volume.

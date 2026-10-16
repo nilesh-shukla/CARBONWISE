@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app import __version__
@@ -22,12 +23,19 @@ class Settings(BaseSettings):
     APP_NAME: str = "Household Carbon Footprint Estimation API"
     APP_VERSION: str = __version__
     APP_ENV: Literal["development", "testing", "production"] = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
     API_V1_STR: str = "/api/v1"
     HOST: str = "127.0.0.1"
     PORT: int = 8000
     DEFAULT_REGION: str = "India"
     FACTORS_FILE_PATH: str = "data/emission_factors/factors.yaml"
+
+    @model_validator(mode="after")
+    def validate_environment(self) -> "Settings":
+        """Reject unsafe debug settings in production."""
+        if self.APP_ENV == "production" and self.DEBUG:
+            raise ValueError("DEBUG must be false when APP_ENV=production")
+        return self
 
     @property
     def factors_path(self) -> Path:

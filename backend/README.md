@@ -68,6 +68,55 @@ Once running:
 - **Interactive Swagger Docs**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **ReDoc Documentation**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
+### Containerized local stack
+
+This Compose setup is for local development only. It is not a production deployment:
+production still needs an HTTPS ingress to Go, private FastAPI and PostgreSQL networking,
+externally managed secrets, and tested database backups and recovery.
+
+The complete local backend stack is defined in
+[`go-service/compose.yaml`](go-service/compose.yaml). From the repository root:
+
+```powershell
+cd backend\go-service
+docker compose config --quiet
+docker compose up --build -d
+docker compose ps
+```
+
+This starts PostgreSQL, the FastAPI calculator, and the Go API. Only the development
+ports for FastAPI (`127.0.0.1:8000`) and Go (`127.0.0.1:8080`) are published to the
+host. FastAPI is addressed internally by Go as `http://fastapi:8000`; PostgreSQL is
+addressed internally as `postgres:5432`.
+
+The default PostgreSQL password and JWT secret are development-only Compose defaults.
+Override them with environment variables or a local, untracked `.env` file before
+sharing the stack. Never use these defaults in a deployed environment.
+
+Verify the services:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8080/health
+Invoke-RestMethod http://127.0.0.1:8080/readyz
+docker compose ps
+docker compose logs --tail 100 postgres fastapi go-api
+```
+
+Stop the stack without deleting the named PostgreSQL volume:
+
+```powershell
+docker compose down
+```
+
+Use `docker compose down -v` only when you intentionally want to delete the local
+database and all persisted development data. It is not part of the normal shutdown
+workflow.
+
+The image build context excludes private HCES exports, environment files, virtual
+environments, caches, tests, and unrelated project directories. The required
+`data/emission_factors/factors.yaml` file is included in the FastAPI image.
+
 ### Calculation API Semantics (`POST /api/v1/calculate`)
 - **Status Semantics**:
   - `complete_for_provided_inputs`: Every supplied activity was successfully calculated (`total_is_partial: false`).

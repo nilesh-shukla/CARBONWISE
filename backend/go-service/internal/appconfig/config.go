@@ -3,11 +3,14 @@ package appconfig
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 )
+
+const maxProductionAccessTokenTTL = 15 * time.Minute
 
 type Config struct {
 	Environment, ListenAddress, DatabaseURL  string
@@ -28,9 +31,12 @@ func Load() (Config, error) {
 		JWTIssuer: get("JWT_ISSUER", "carbonwise-go-api"), JWTAudience: get("JWT_AUDIENCE", "carbonwise-client"),
 		FastAPIURL: get("FASTAPI_URL", "http://127.0.0.1:8000"), CookieName: get("REFRESH_COOKIE_NAME", "carbonwise_refresh"),
 		CookieDomain: os.Getenv("COOKIE_DOMAIN"), CookieSameSite: get("COOKIE_SAME_SITE", "lax"),
-		CookieSecure: get("COOKIE_SECURE", "true") == "true", DBMaxOpenConns: 20, DBMaxIdleConns: 5, DBConnMaxLifetime: 5 * time.Minute,
+		DBMaxOpenConns: 20, DBMaxIdleConns: 5, DBConnMaxLifetime: 5 * time.Minute,
 	}
 	var err error
+	if c.CookieSecure, err = boolean("COOKIE_SECURE", true); err != nil {
+		return c, err
+	}
 	if c.AccessTokenTTL, err = duration("ACCESS_TOKEN_TTL", "15m"); err != nil {
 		return c, err
 	}
@@ -62,10 +68,60 @@ func Load() (Config, error) {
 	if c.DBMaxOpenConns < 1 || c.DBMaxIdleConns < 0 || c.DBMaxIdleConns > c.DBMaxOpenConns {
 		return c, errors.New("invalid database pool limits")
 	}
-	if c.Environment == "production" && (!c.CookieSecure || len(c.AllowedOrigins) == 0) {
-		return c, errors.New("production requires secure refresh cookies and ALLOWED_ORIGINS")
+	if c.Environment == "production" {
+		if err = validateProduction(c); err != nil {
+			return c, err
+		}
 	}
 	return c, nil
+}
+
+func validateProduction(c Config) error {
+	if weakProductionSecret(c.JWTSecret) {
+		return errors.New("production requires a non-development JWT_SECRET")
+	}
+	if c.AccessTokenTTL > maxProductionAccessTokenTTL {
+		return fmt.Errorf("production ACCESS_TOKEN_TTL must not exceed %s", maxProductionAccessTokenTTL)
+	}
+	if !c.CookieSecure {
+		return errors.New("production requires COOKIE_SECURE=true")
+	}
+	if len(c.AllowedOrigins) == 0 {
+		return errors.New("production requires ALLOWED_ORIGINS")
+	}
+	for _, origin := range c.AllowedOrigins {
+		parsed, err := url.Parse(origin)
+		if err != nil || parsed.Scheme != "https" || parsed.Host == "" || strings.Contains(parsed.Host, "*") || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return errors.New("production ALLOWED_ORIGINS must contain exact HTTPS origins")
+		}
+	}
+	parsed, err := url.Parse(c.DatabaseURL)
+	if err != nil || (parsed.Scheme != "postgres" && parsed.Scheme != "postgresql") || parsed.User == nil || parsed.Host == "" {
+		return errors.New("production DATABASE_URL must be an explicit PostgreSQL URL")
+	}
+	if parsed.User.Username() == "carbonwise" || parsed.User.Username() == "" {
+		return errors.New("production DATABASE_URL must not use development database credentials")
+	}
+	if password, ok := parsed.User.Password(); !ok || password == "" || password == "local-development-only" {
+		return errors.New("production DATABASE_URL must use explicit non-development database credentials")
+	}
+	sslmode := parsed.Query().Get("sslmode")
+	if sslmode != "require" && sslmode != "verify-ca" && sslmode != "verify-full" {
+		return errors.New("production DATABASE_URL must require PostgreSQL TLS")
+	}
+	return nil
+}
+
+func weakProductionSecret(secret string) bool {
+	lower := strings.ToLower(secret)
+	if secret == "local-development-jwt-secret-change-me-before-sharing" || strings.Contains(lower, "replace-with") || strings.Contains(lower, "local-development") {
+		return true
+	}
+	unique := map[rune]struct{}{}
+	for _, r := range secret {
+		unique[r] = struct{}{}
+	}
+	return len(unique) < 8
 }
 
 func get(k, d string) string {
@@ -89,6 +145,17 @@ func integer(k string, d int) (int, error) {
 		return 0, fmt.Errorf("%s: %w", k, e)
 	}
 	return out, nil
+}
+func boolean(k string, d bool) (bool, error) {
+	v := get(k, strconv.FormatBool(d))
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s must be true or false", k)
+	}
 }
 func split(v string) []string {
 	var out []string
