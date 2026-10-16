@@ -284,13 +284,14 @@ def _add_numeric(profile: dict[str, Any], value: str) -> None:
 
 def _scan_level01(
     path: Path,
-) -> tuple[dict[str, Any], dict[str, str], set[str], dict[str, str]]:
+) -> tuple[dict[str, Any], dict[str, tuple[str, str]], set[str]]:
     header, (handle, reader) = _read_csv(path, LEVEL01_COLUMNS, "Level 01")
     rows = 0
     keys: set[str] = set()
-    counts: Counter[str] = Counter()
+    duplicate_keys: set[str] = set()
     status_by_key: dict[str, str] = {}
-    multiplier_by_key: dict[str, str] = {}
+    duplicate_household_keys = 0
+    duplicate_rows = 0
     missing_fields: Counter[str] = Counter()
     numeric = {"mult": _numeric_profile()}
     malformed = 0
@@ -307,10 +308,17 @@ def _scan_level01(
                     missing_fields[field] += 1
             key, incomplete = _key(record, "Level 01", row_number)
             incomplete_keys += incomplete
-            keys.add(key)
-            counts[key] += 1
-            status_by_key[key] = record.get("b1q1pt13", "").strip()
-            multiplier_by_key[key] = record["mult"].strip()
+            if key in keys:
+                if key not in duplicate_keys:
+                    duplicate_keys.add(key)
+                    duplicate_household_keys += 1
+                duplicate_rows += 1
+            else:
+                keys.add(key)
+            status_by_key[key] = (
+                record.get("b1q1pt13", "").strip(),
+                record["mult"].strip(),
+            )
             _add_numeric(numeric["mult"], record["mult"])
     finally:
         handle.close()
@@ -323,14 +331,13 @@ def _scan_level01(
             "malformed_row_widths": malformed,
             "missing_required_key_components": incomplete_keys,
             "unique_household_keys": len(keys),
-            "duplicate_household_keys": sum(count > 1 for count in counts.values()),
-            "duplicate_rows": sum(count - 1 for count in counts.values() if count > 1),
+            "duplicate_household_keys": duplicate_household_keys,
+            "duplicate_rows": duplicate_rows,
             "missing_cells_by_column": dict(sorted(missing_fields.items())),
             "multiplier": numeric["mult"],
         },
         status_by_key,
         keys,
-        multiplier_by_key,
     )
 
 
@@ -338,7 +345,9 @@ def _scan_level03(path: Path) -> tuple[dict[str, Any], set[str]]:
     header, (handle, reader) = _read_csv(path, LEVEL03_COLUMNS, "Level 03")
     rows = 0
     keys: set[str] = set()
-    counts: Counter[str] = Counter()
+    duplicate_keys: set[str] = set()
+    duplicate_household_keys = 0
+    duplicate_rows = 0
     missing_fields: Counter[str] = Counter()
     primary_fuels: Counter[str] = Counter()
     numeric = {field: _numeric_profile() for field in ("b2q2pt1", "mult")}
@@ -356,8 +365,13 @@ def _scan_level03(path: Path) -> tuple[dict[str, Any], set[str]]:
                     missing_fields[field] += 1
             key, incomplete = _key(record, "Level 03", row_number)
             incomplete_keys += incomplete
-            keys.add(key)
-            counts[key] += 1
+            if key in keys:
+                if key not in duplicate_keys:
+                    duplicate_keys.add(key)
+                    duplicate_household_keys += 1
+                duplicate_rows += 1
+            else:
+                keys.add(key)
             primary_fuels[record["b4q4pt21"].strip()] += 1
             for field, profile in numeric.items():
                 _add_numeric(profile, record[field])
@@ -372,8 +386,8 @@ def _scan_level03(path: Path) -> tuple[dict[str, Any], set[str]]:
             "malformed_row_widths": malformed,
             "missing_required_key_components": incomplete_keys,
             "unique_household_keys": len(keys),
-            "duplicate_household_keys": sum(count > 1 for count in counts.values()),
-            "duplicate_rows": sum(count - 1 for count in counts.values() if count > 1),
+            "duplicate_household_keys": duplicate_household_keys,
+            "duplicate_rows": duplicate_rows,
             "missing_cells_by_column": dict(sorted(missing_fields.items())),
             "household_size": numeric["b2q2pt1"],
             "primary_cooking_fuel_codes": dict(sorted(primary_fuels.items())),
@@ -385,11 +399,12 @@ def _scan_level03(path: Path) -> tuple[dict[str, Any], set[str]]:
 def _scan_level08(
     path: Path,
     level01_keys: set[str],
-    status_by_key: dict[str, str],
-    multiplier_by_key: dict[str, str],
+    household_metadata: dict[str, tuple[str, str]],
     progress: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     header, (handle, reader) = _read_csv(path, LEVEL08_COLUMNS, "Level 08")
+    if progress:
+        progress("Level 08 CSV header validated")
     column = {name: index for index, name in enumerate(header)}
     key_positions = tuple(
         (column[field], field, width)
@@ -398,7 +413,6 @@ def _scan_level08(
     profile_positions = tuple(column[field] for field in LEVEL08_PROFILE_FIELDS)
     rows = 0
     household_keys: set[str] = set()
-    unique_households_by_item: Counter[str] = Counter()
     duplicate_items = 0
     multiplier_mismatches = 0
     missing_fields: Counter[str] = Counter()
@@ -416,18 +430,22 @@ def _scan_level08(
     malformed = 0
     incomplete_keys = 0
     temp_dir = tempfile.TemporaryDirectory(prefix=".hces-audit-", dir=path.parent)
+    if progress:
+        progress("Created temporary audit workspace")
     connection = sqlite3.connect(Path(temp_dir.name) / "household_items.sqlite3")
     connection.execute("PRAGMA journal_mode = OFF")
     connection.execute("PRAGMA synchronous = OFF")
+    connection.execute("PRAGMA temp_store = MEMORY")
     connection.execute(
-        "CREATE TABLE household_items (household_key TEXT, item_code TEXT, "
-        "PRIMARY KEY (household_key, item_code)) WITHOUT ROWID"
+        "CREATE TABLE household_items (item_code TEXT, household_key TEXT)"
     )
+    if progress:
+        progress("Temporary index table ready")
     batch: list[tuple[str, str]] = []
     try:
         for row_number, values in enumerate(reader, start=2):
             rows += 1
-            if progress and rows % 100_000 == 0:
+            if progress and rows % 25_000 == 0:
                 progress(f"Level 08 scanned {rows:,} rows")
             if len(values) != len(header):
                 malformed += 1
@@ -444,20 +462,19 @@ def _scan_level08(
             household_keys.add(key)
             if key not in level01_keys:
                 unmatched_rows += 1
-            elif values[column["mult"]].strip() != multiplier_by_key.get(key, ""):
-                multiplier_mismatches += 1
+            else:
+                _, expected_multiplier = household_metadata.get(key, ("", ""))
+                if values[column["mult"]].strip() != expected_multiplier:
+                    multiplier_mismatches += 1
             code = values[column["b8pt1q2"]].strip()
             item_code_rows[code] += 1
-            batch.append((key, code))
+            batch.append((code, key))
             if len(batch) >= 100_000:
-                before = connection.total_changes
+                if progress:
+                    progress("Writing a 100,000-row temporary index batch")
                 connection.executemany(
-                    "INSERT OR IGNORE INTO household_items VALUES (?, ?)", batch
+                    "INSERT INTO household_items VALUES (?, ?)", batch
                 )
-                inserted = connection.total_changes - before
-                duplicate_items += len(batch) - inserted
-                for _, item in batch:
-                    unique_households_by_item[item] += 1
                 batch.clear()
             if code not in TARGET_CODES:
                 continue
@@ -475,21 +492,24 @@ def _scan_level08(
                     pass
     finally:
         if batch:
-            before = connection.total_changes
-            connection.executemany(
-                "INSERT OR IGNORE INTO household_items VALUES (?, ?)", batch
-            )
-            inserted = connection.total_changes - before
-            duplicate_items += len(batch) - inserted
-            # Correct per-item unique counts by querying the final index below.
+            connection.executemany("INSERT INTO household_items VALUES (?, ?)", batch)
         connection.commit()
-        unique_households_by_item.clear()
-        unique_households_by_item.update(
+        if progress:
+            progress("Building temporary item/household index for duplicate check")
+        connection.execute(
+            "CREATE INDEX household_items_by_item_key "
+            "ON household_items(item_code, household_key)"
+        )
+        unique_households_by_item = Counter(
             dict(
                 connection.execute(
-                    "SELECT item_code, COUNT(*) FROM household_items GROUP BY item_code"
+                    "SELECT item_code, COUNT(DISTINCT household_key) "
+                    "FROM household_items GROUP BY item_code"
                 ).fetchall()
             )
+        )
+        duplicate_items = sum(item_code_rows.values()) - sum(
+            unique_households_by_item.values()
         )
         connection.close()
         temp_dir.cleanup()
@@ -528,7 +548,8 @@ def _scan_level08(
         "missing_level08_household_survey_codes": dict(
             sorted(
                 Counter(
-                    status_by_key.get(key, "") for key in level01_keys - household_keys
+                    household_metadata.get(key, ("", ""))[0]
+                    for key in level01_keys - household_keys
                 ).items()
             )
         ),
@@ -563,16 +584,17 @@ def audit_exports(
 
     if progress:
         progress("Scanning Level 01 identifiers and multipliers")
-    level01, status_by_key, level01_keys, multiplier_by_key = _scan_level01(
-        paths["level01"]
-    )
+    level01, household_metadata, level01_keys = _scan_level01(paths["level01"])
     if progress:
         progress("Scanning Level 03 identifiers and household descriptors")
     level03, level03_keys = _scan_level03(paths["level03"])
+    level01_only = len(level01_keys - level03_keys)
+    level03_only = len(level03_keys - level01_keys)
+    del level03_keys
     if progress:
         progress("Scanning Level 08 item observations and joins")
     level08 = _scan_level08(
-        paths["level08"], level01_keys, status_by_key, multiplier_by_key, progress
+        paths["level08"], level01_keys, household_metadata, progress
     )
 
     level08_keys = level08.pop("household_keys")
@@ -598,8 +620,8 @@ def audit_exports(
         "levels": {"01": level01, "03": level03, "08": level08},
         "joins": {
             "level01_to_level03": {
-                "level01_only_households": len(level01_keys - level03_keys),
-                "level03_only_households": len(level03_keys - level01_keys),
+                "level01_only_households": level01_only,
+                "level03_only_households": level03_only,
             },
             "level01_to_level08": {
                 "level08_only_households": len(level08_keys - level01_keys),

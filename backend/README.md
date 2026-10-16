@@ -309,3 +309,11 @@ pytest -v
 | `tests/test_health.py` | Unit and integration tests for `/health` endpoint schema and status. |
 | `tests/test_root.py` | Unit and integration tests for `/` endpoint schema and documentation links. |
 | `tests/test_errors.py` | Verification of centralized 404, 405, and 422 error handling formatting. |
+
+## Go authenticated API
+
+`backend/go-service` contains a separate Go + Chi API for account authentication and
+persisted calculation history. It delegates emissions calculations to the existing FastAPI
+service and uses PostgreSQL migrations. See [the Go API guide](go-service/README.md) for
+setup, configuration, and API examples. The Python calculator remains the source of truth
+for emissions calculations.

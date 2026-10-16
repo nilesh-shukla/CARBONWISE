@@ -1,6 +1,6 @@
 # HCES 2022–23: Empirical Data Readiness and Harmonization Contract
 
-**CARBONWISE C5.3 | Status: C5.2 structural findings retained; harmonized empirical targets blocked**
+**CARBONWISE C5.3 | Status: full structural audit completed; harmonized empirical targets blocked**
 
 This document records what the supplied HCES exports and official material establish,
 what remains unresolved, and the guardrails for any later empirical analysis. HCES records
@@ -8,10 +8,9 @@ remain in the user-managed private directory outside the repository. No HCES-der
 household table, model input matrix, imputation, calibration, or model training is part of
 this milestone.
 
-The counts in this document are from the completed C5.2 record audit. C5.3 added a
-repeatable aggregate-only audit command and fixture tests, but its full private-directory
-CLI run did not finish in this environment, so no new machine-readable report was produced.
-The command’s completion against the full exports remains to be verified.
+The full C5.3.1 audit completed against the four private exports. Its aggregate report is
+`D:\CARBONWISE-private-data\HCES-2022-23\hces_readiness_audit.json`; audited row counts and
+target observations reconcile with the C5.2 findings below. The JSON remains outside Git.
 
 ## 1. Inputs and evidence status
 
@@ -123,11 +122,11 @@ semantics are settled.
 `backend/scripts/audit_hces_exports.py` performs a deterministic, read-only structural
 audit with the Python standard library. It checks exact export columns and order, row widths,
 reconstructed keys, duplicates, joins, multiplier consistency, raw quantity
-missing/zero/negative/non-finite counts, and source-code frequencies. It creates a temporary
-SQLite index containing only household-key/item pairs inside the private input directory,
-then removes it automatically. The aggregate JSON includes source filenames and byte sizes,
-but no file hashes, household keys, or row-level records. It explicitly records that weights
-were not applied, imputation was not performed, and harmonized targets were not created.
+missing/zero/negative/non-finite counts, and source-code frequencies. It writes a temporary
+SQLite index of household-key/item pairs inside the private input directory, then removes it
+automatically. The aggregate JSON includes source filenames and byte sizes, but no hashes,
+household keys, or row-level records. It explicitly records that weights were not applied,
+imputation was not performed, and harmonized targets were not created.
 
 Run from `backend/`:
 
@@ -137,8 +136,8 @@ python -m scripts.audit_hces_exports --input-dir "D:\CARBONWISE-private-data\HCE
 
 By default it writes only an aggregate JSON report to
 `<input-dir>\hces_readiness_audit.json`. Use `--output` to choose a different private path.
-The report includes file hashes but no household keys or row-level records. Keep both source
-files and report outside the Git repository. Do not use this report as an analysis dataset.
+The report contains aggregate counts and profiles only. Keep both source files and report
+outside the Git repository. Do not use this report as an analysis dataset.
 
 ## 5. Decisions and blockers
 

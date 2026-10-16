@@ -198,7 +198,12 @@ def test_duplicate_and_unmatched_records_are_counted_not_silently_joined(tmp_pat
     one_path = tmp_path / LEVEL01_FILENAME
     with one_path.open(encoding="utf-8", newline="") as source:
         one_rows = list(csv.DictReader(source))
-    _write_csv(one_path, LEVEL01_HEADER, [*one_rows, one_rows[0]])
+    _write_csv(one_path, LEVEL01_HEADER, [*one_rows, one_rows[0], one_rows[0]])
+
+    three_path = tmp_path / LEVEL03_FILENAME
+    with three_path.open(encoding="utf-8", newline="") as source:
+        three_rows = list(csv.DictReader(source))
+    _write_csv(three_path, LEVEL03_HEADER, [*three_rows, three_rows[0], three_rows[0]])
 
     eight_path = tmp_path / LEVEL08_FILENAME
     with eight_path.open(encoding="utf-8", newline="") as source:
@@ -209,6 +214,9 @@ def test_duplicate_and_unmatched_records_are_counted_not_silently_joined(tmp_pat
 
     report = audit_exports(tmp_path)
     assert report["levels"]["01"]["duplicate_household_keys"] == 1
+    assert report["levels"]["01"]["duplicate_rows"] == 2
+    assert report["levels"]["03"]["duplicate_household_keys"] == 1
+    assert report["levels"]["03"]["duplicate_rows"] == 2
     assert report["levels"]["08"]["unmatched_rows_vs_level01"] == 1
     assert report["levels"]["08"]["duplicate_household_item_keys"] == 0
 
