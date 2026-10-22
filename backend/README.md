@@ -117,6 +117,10 @@ The image build context excludes private HCES exports, environment files, virtua
 environments, caches, tests, and unrelated project directories. The required
 `data/emission_factors/factors.yaml` file is included in the FastAPI image.
 
+For manual Render deployment preparation using an existing Neon PostgreSQL database, see
+[`RENDER.md`](RENDER.md). It keeps Go as the only public backend entry point, FastAPI
+private, and the Neon connection string as a manually configured Render secret.
+
 ### Calculation API Semantics (`POST /api/v1/calculate`)
 - **Status Semantics**:
   - `complete_for_provided_inputs`: Every supplied activity was successfully calculated (`total_is_partial: false`).

@@ -114,6 +114,24 @@ func TestLoadValidProductionConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadUsesRenderPortWhenListenAddressIsUnset(t *testing.T) {
+	restore := setEnvironment(map[string]string{
+		"APP_ENV":           "development",
+		"DATABASE_URL":      "postgres://127.0.0.1:5433/carbonwise?sslmode=disable",
+		"JWT_SECRET":        "local-development-jwt-secret-change-me-before-sharing",
+		"PORT":              "10000",
+		"REFRESH_TOKEN_TTL": "720h",
+	})
+	defer restore()
+	config, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if config.ListenAddress != ":10000" {
+		t.Fatalf("ListenAddress = %q, want %q", config.ListenAddress, ":10000")
+	}
+}
+
 func productionEnv(databaseURL string) map[string]string {
 	return map[string]string{
 		"APP_ENV":           "production",
@@ -132,7 +150,7 @@ func withEnv(env map[string]string, key, value string) map[string]string {
 }
 
 func setEnvironment(values map[string]string) func() {
-	keys := []string{"APP_ENV", "DATABASE_URL", "JWT_SECRET", "COOKIE_SECURE", "ALLOWED_ORIGINS", "ACCESS_TOKEN_TTL", "REFRESH_TOKEN_TTL", "COOKIE_SAME_SITE", "DB_MAX_OPEN_CONNS", "DB_MAX_IDLE_CONNS"}
+	keys := []string{"APP_ENV", "DATABASE_URL", "JWT_SECRET", "COOKIE_SECURE", "ALLOWED_ORIGINS", "ACCESS_TOKEN_TTL", "REFRESH_TOKEN_TTL", "COOKIE_SAME_SITE", "DB_MAX_OPEN_CONNS", "DB_MAX_IDLE_CONNS", "LISTEN_ADDRESS", "PORT"}
 	previous := make(map[string]string, len(keys))
 	for _, key := range keys {
 		previous[key] = os.Getenv(key)

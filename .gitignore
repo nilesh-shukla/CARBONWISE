@@ -26,3 +26,6 @@ __pycache__/
 # OS specific
 Thumbs.db
 .DS_Store
+.neon
+node_modules/
+.env.local

@@ -9,6 +9,9 @@ This service provides authenticated accounts and calculation history. It delegat
 emissions calculation to the existing FastAPI endpoint at `POST /api/v1/calculate`; FastAPI
 remains the calculation source of truth. The Go API does not protect direct access to FastAPI,
 so deploy FastAPI on a private network or restrict its ingress at the network/proxy layer.
+For Render deployment preparation with an existing Neon database, see
+[`../RENDER.md`](../RENDER.md). No Neon secret or deployment-specific private URL belongs
+in this repository.
 
 ## Requirements and local start
 

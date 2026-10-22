@@ -26,7 +26,7 @@ type Config struct {
 
 func Load() (Config, error) {
 	c := Config{
-		Environment: get("APP_ENV", "development"), ListenAddress: get("LISTEN_ADDRESS", ":8080"),
+		Environment: get("APP_ENV", "development"), ListenAddress: listenAddress(),
 		DatabaseURL: os.Getenv("DATABASE_URL"), JWTSecret: os.Getenv("JWT_SECRET"),
 		JWTIssuer: get("JWT_ISSUER", "carbonwise-go-api"), JWTAudience: get("JWT_AUDIENCE", "carbonwise-client"),
 		FastAPIURL: get("FASTAPI_URL", "http://127.0.0.1:8000"), CookieName: get("REFRESH_COOKIE_NAME", "carbonwise_refresh"),
@@ -74,6 +74,16 @@ func Load() (Config, error) {
 		}
 	}
 	return c, nil
+}
+
+func listenAddress() string {
+	if address := os.Getenv("LISTEN_ADDRESS"); address != "" {
+		return address
+	}
+	if port := os.Getenv("PORT"); port != "" {
+		return ":" + port
+	}
+	return ":8080"
 }
 
 func validateProduction(c Config) error {
