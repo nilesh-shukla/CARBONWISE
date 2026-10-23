@@ -115,6 +115,17 @@ def test_real_factors_yaml_loading() -> None:
     assert lpg.boundary == "direct_scope_1"
 
 
+def test_region_matching_is_case_insensitive() -> None:
+    """India casing resolves the same configured electricity factor."""
+    registry = EmissionFactorRegistry.from_yaml(Path("data/emission_factors/factors.yaml"))
+
+    title_case = registry.get_factor("electricity", "grid_electricity", "India")
+    lower_case = registry.get_factor("electricity", "grid_electricity", "india")
+
+    assert title_case.id == lower_case.id
+    assert title_case.value == lower_case.value
+
+
 def test_registry_activity_unit_mismatch_raises() -> None:
     """Verify that mismatch between expected and configured activity unit raises IncompatibleUnitError."""
     yaml_path = Path("data/emission_factors/factors.yaml")

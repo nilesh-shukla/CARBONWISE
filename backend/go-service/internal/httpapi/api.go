@@ -229,7 +229,12 @@ func (a *API) createCalculation(w http.ResponseWriter, r *http.Request) {
 	}
 	result, body, e := a.calculator.Calculate(r.Context(), raw)
 	if e != nil {
-		a.log.Warn("calculation upstream failed", "request_id", middleware.GetReqID(r.Context()), "error", e)
+		var upstreamStatus *calculator.UpstreamStatusError
+		if errors.As(e, &upstreamStatus) {
+			a.log.Warn("calculation upstream failed", "request_id", middleware.GetReqID(r.Context()), "upstream_status", upstreamStatus.StatusCode)
+		} else {
+			a.log.Warn("calculation upstream failed", "request_id", middleware.GetReqID(r.Context()), "failure_kind", "transport_or_response")
+		}
 		writeError(w, 502, "CALCULATOR_UNAVAILABLE", "Calculation service failed or returned an invalid response.")
 		return
 	}

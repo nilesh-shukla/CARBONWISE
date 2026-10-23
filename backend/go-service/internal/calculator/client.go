@@ -45,6 +45,14 @@ type Client struct {
 	http *http.Client
 }
 
+type UpstreamStatusError struct {
+	StatusCode int
+}
+
+func (e *UpstreamStatusError) Error() string {
+	return fmt.Sprintf("calculator returned HTTP %d", e.StatusCode)
+}
+
 func New(c appconfig.Config) *Client {
 	return &Client{base: strings.TrimRight(c.FastAPIURL, "/"), http: &http.Client{Timeout: 8 * time.Second}}
 }
@@ -64,7 +72,9 @@ func (c *Client) Calculate(ctx context.Context, input json.RawMessage) (Response
 		return Response{}, nil, fmt.Errorf("read calculator response: %w", e)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return Response{}, nil, fmt.Errorf("calculator returned HTTP %d", resp.StatusCode)
+		// Upstream error bodies can echo user-supplied values, so retain only the
+		// status code for safe diagnostics.
+		return Response{}, nil, &UpstreamStatusError{StatusCode: resp.StatusCode}
 	}
 	var result Response
 	if e = json.Unmarshal(body, &result); e != nil {

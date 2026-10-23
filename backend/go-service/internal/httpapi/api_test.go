@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -86,5 +87,37 @@ func TestRefreshCookieSecurityAttributes(t *testing.T) {
 		if !strings.Contains(setCookie, required) {
 			t.Fatalf("Set-Cookie missing %q: %s", required, setCookie)
 		}
+	}
+}
+
+func TestCalculationUpstreamFailureLogsOnlySafeStatus(t *testing.T) {
+	const secretActivity = "activity-value-should-not-be-logged-8123"
+	const upstreamBody = "upstream detail containing " + secretActivity
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, upstreamBody, http.StatusBadGateway)
+	}))
+	defer upstream.Close()
+
+	var logs strings.Builder
+	api := testAPI()
+	api.log = slog.New(slog.NewTextHandler(&logs, nil))
+	api.calculator = calculator.New(appconfig.Config{FastAPIURL: upstream.URL})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/calculations", strings.NewReader(`{"electricity_kwh_per_month":8123}`))
+	api.createCalculation(recorder, request)
+
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502", recorder.Code)
+	}
+	var body map[string]map[string]string
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["error"]["code"] != "CALCULATOR_UNAVAILABLE" || strings.Contains(recorder.Body.String(), upstreamBody) {
+		t.Fatalf("unexpected client error body: %s", recorder.Body.String())
+	}
+	logOutput := logs.String()
+	if !strings.Contains(logOutput, "upstream_status=502") || strings.Contains(logOutput, upstreamBody) || strings.Contains(logOutput, secretActivity) || strings.Contains(logOutput, upstream.URL) {
+		t.Fatalf("unsafe or missing upstream diagnostic: %s", logOutput)
 	}
 }
