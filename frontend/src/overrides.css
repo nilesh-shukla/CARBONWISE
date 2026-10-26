@@ -1,0 +1,260 @@
+/* overrides.css – premium UI design enhancements */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Global smooth transitions */
+* {
+  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
+}
+
+:root {
+  --emerald: #50c878; /* vibrant emerald accent */
+  --ivory: #fdf5e6; /* warm ivory background */
+  --brand: var(--emerald);
+  --brand-light: #77c99a;
+  --forest: #2c5f2d; /* forest green */
+}
+
+/* Hero gradient background */
+.hero {
+  background: linear-gradient(135deg, var(--ivory) 0%, #fff0e0 100%);
+  padding: 80px 30px;
+  border-radius: 12px;
+}
+
+/* Button dark uses emerald accent */
+.button.dark {
+  background: var(--emerald) !important;
+  color: white;
+  transition: background .2s ease;
+}
+.button.dark:hover {
+  background: #3b9d6a !important;
+}
+
+/* Card shadows and subtle elevation */
+.metric-card,
+.preview-card,
+.result-card,
+.settings-card,
+.history-list {
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ivory);
+}
+
+/* Smooth micro‑interactions for interactive elements */
+button,
+.button,
+.nav-item,
+[role="dialog"] .close {
+  transition: transform .15s ease, background-color .2s ease, box-shadow .15s ease;
+}
+button:hover,
+.button:hover,
+.nav-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+/* Refine focus outlines */
+input:focus,
+select:focus,
+button:focus {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(80,200,120,0.3);
+  background: var(--ivory);
+}
+
+/* Brand and navigation refinements */
+.brand {
+  color: var(--brand) !important;
+  font-weight: 600;
+}
+.brand:hover {
+  color: var(--brand-light) !important;
+  text-decoration: underline;
+}
+
+/* Sidebar gradient background */
+.sidebar {
+  background: linear-gradient(180deg, var(--forest) 0%, var(--emerald) 100%);
+  color: var(--ivory);
+}
+
+/* Active navigation item */
+.nav-item.active {
+  background: rgba(255,255,255,0.12);
+  color: var(--ivory);
+  font-weight: 600;
+}
+
+/* Modal elevation and border radius */
+.modal {
+  box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+  border-radius: 14px;
+  background: var(--ivory);
+}
+
+/* Dashboard specific enhancements */
+.metric-grid {
+  gap: 20px;
+  margin-bottom: 30px;
+}
+.metric-card {
+  padding: 24px;
+  background: var(--ivory);
+  border: 1px solid var(--line);
+}
+.metric-card.primary {
+  background: var(--forest);
+  color: var(--ivory);
+}
+.metric-card strong {
+  font-size: 34px;
+  letter-spacing: -0.03em;
+}
+.result-card {
+  gap: 24px;
+  align-items: start;
+}
+.result-main strong {
+  font-size: 44px;
+  color: var(--forest);
+}
+.breakdown .bar i {
+  background: var(--emerald);
+}
+.empty-card {
+  background: var(--ivory);
+  border: 1px solid var(--line);
+}
+@media (max-width: 800px) {
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* UI State Polish: Skeletons, Spinners & States */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulseGlow {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.loading-spin, .button-spinner, .splash-spinner {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+.splash-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(80, 200, 120, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--forest);
+  margin-bottom: 8px;
+}
+
+.state-icon {
+  margin: 0 auto 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 24px;
+}
+
+.loading-state .state-icon {
+  color: var(--emerald);
+}
+
+.loading-state p {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 24px;
+}
+
+.error-state .error-icon {
+  color: #c95147;
+  background: #fdf0ee;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+}
+
+.error-state h3 {
+  margin: 0;
+  color: var(--forest);
+  font-size: 18px;
+}
+
+.error-state p.error {
+  max-width: 480px;
+  margin: 0 auto 8px;
+}
+
+/* Skeletons */
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 600px;
+  margin-top: 16px;
+}
+
+@media (max-width: 800px) {
+  .skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.skeleton-card {
+  height: 110px;
+  background: linear-gradient(90deg, #f0eee6 25%, #e6e3da 50%, #f0eee6 75%);
+  background-size: 200% 100%;
+  animation: pulseGlow 1.8s ease-in-out infinite;
+  border-radius: 10px;
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  margin-top: 16px;
+}
+
+.skeleton-row {
+  height: 48px;
+  background: linear-gradient(90deg, #f0eee6 25%, #e6e3da 50%, #f0eee6 75%);
+  background-size: 200% 100%;
+  animation: pulseGlow 1.8s ease-in-out infinite;
+  border-radius: 8px;
+}
+
